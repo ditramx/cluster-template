@@ -1,0 +1,41 @@
+deployment:
+  replicas: 1
+
+service:
+  type: LoadBalancer
+  loadBalancerIP: <METALLB_IP>
+
+ports:
+  web:
+    port: 8000
+    expose:
+      default: true
+    exposedPort: 80
+    protocol: TCP
+    redirectTo:
+      port: websecure
+  websecure:
+    port: 8443
+    expose:
+      default: true
+    exposedPort: 443
+    protocol: TCP
+
+providers:
+  kubernetesCRD:
+    enabled: true
+    allowCrossNamespaceResources: true
+  kubernetesIngress:
+    enabled: true
+
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+
+globalArguments:
+  - "--global.checknewversion=false"
+  - "--global.sendanonymoususage=false"
+
+logs:
+  general:
+    level: INFO

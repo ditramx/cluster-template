@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: argocd
+data:
+  service.webhook.webex: |
+    url: $webex-webhook-url
+    headers:
+    - name: Content-Type
+      value: application/json
+
+  # Para activar email: sellar smtp-host, smtp-from, smtp-username, smtp-password en argocd-notifications-secret
+  service.email.smtp: |
+    host: $smtp-host
+    port: 587
+    from: $smtp-from
+    username: $smtp-username
+    password: $smtp-password
+    use_ssl: $smtp-use-tls
+    html: true
+
+  template.app-sync-failed: |
+    webhook:
+      webex:
+        method: POST
+        body: |
+          {
+            "markdown": "**Deploy FAILED** `{{.app.metadata.name}}`\n**Rev:** {{if .app.status.operationState.syncResult.revision}}{{substr 0 7 .app.status.operationState.syncResult.revision}}{{else if .app.status.sync.revision}}{{substr 0 7 .app.status.sync.revision}}{{else}}{{substr 0 7 (index .app.status.sync.revisions 1)}}{{end}} | **Namespace:** {{.app.spec.destination.namespace}}\n**Error:** {{.app.status.operationState.message}}\n[Ver commit]({{index .app.metadata.annotations "github-repo-url"}}/commit/{{if .app.status.operationState.syncResult.revision}}{{.app.status.operationState.syncResult.revision}}{{else if .app.status.sync.revision}}{{.app.status.sync.revision}}{{else}}{{index .app.status.sync.revisions 1}}{{end}}) | [Ver en ArgoCD](https://argocd.ditra.mx/applications/{{.app.metadata.name}})"
+          }
+    email:
+      subject: "❌ Sync fallido — {{.app.metadata.name}}"
+      body: |
+        <h2>❌ Sync fallido</h2>
+        <table>
+          <tr><td><b>App</b></td><td>{{.app.metadata.name}}</td></tr>
+          <tr><td><b>Estado</b></td><td>{{.app.status.operationState.phase}}</td></tr>
+          <tr><td><b>Mensaje</b></td><td>{{.app.status.operationState.message}}</td></tr>
+          <tr><td><b>Namespace</b></td><td>{{.app.spec.destination.namespace}}</td></tr>
+          <tr><td><b>Revision</b></td><td>{{if .app.status.sync.revision}}{{substr 0 7 .app.status.sync.revision}}{{else}}{{substr 0 7 (index .app.status.sync.revisions 1)}}{{end}}</td></tr>
+          <tr><td><b>Commit</b></td><td><a href="{{index .app.metadata.annotations "github-repo-url"}}/commit/{{if .app.status.operationState.syncResult.revision}}{{.app.status.operationState.syncResult.revision}}{{else if .app.status.sync.revision}}{{.app.status.sync.revision}}{{else}}{{index .app.status.sync.revisions 1}}{{end}}">Ver en GitHub</a></td></tr>
+        </table>
+
+  template.app-health-degraded: |
+    webhook:
+      webex:
+        method: POST
+        body: |
+          {
+            "markdown": "**Deploy DEGRADED** `{{.app.metadata.name}}`\n**Health:** {{.app.status.health.status}} | **Namespace:** {{.app.spec.destination.namespace}}\n---\n[Ver en ArgoCD](https://argocd.ditra.mx/applications/{{.app.metadata.name}})"
+          }
+    email:
+      subject: "⚠️ App degradada — {{.app.metadata.name}}"
+      body: |
+        <h2>⚠️ App degradada</h2>
+        <table>
+          <tr><td><b>App</b></td><td>{{.app.metadata.name}}</td></tr>
+          <tr><td><b>Health</b></td><td>{{.app.status.health.status}}</td></tr>
+          <tr><td><b>Namespace</b></td><td>{{.app.spec.destination.namespace}}</td></tr>
+        </table>
+
+  template.app-deployed: |
+    webhook:
+      webex:
+        method: POST
+        body: |
+          {
+            "markdown": "**Deploy OK** `{{.app.metadata.name}}`\n**Rev:** {{if .app.status.operationState.syncResult.revision}}{{substr 0 7 .app.status.operationState.syncResult.revision}}{{else if .app.status.sync.revision}}{{substr 0 7 .app.status.sync.revision}}{{else}}{{substr 0 7 (index .app.status.sync.revisions 1)}}{{end}} | **Namespace:** {{.app.spec.destination.namespace}}\n[Ver commit]({{index .app.metadata.annotations "github-repo-url"}}/commit/{{if .app.status.operationState.syncResult.revision}}{{.app.status.operationState.syncResult.revision}}{{else if .app.status.sync.revision}}{{.app.status.sync.revision}}{{else}}{{index .app.status.sync.revisions 1}}{{end}}) | [Ver en ArgoCD](https://argocd.ditra.mx/applications/{{.app.metadata.name}})"
+          }
+    email:
+      subject: "✅ Desplegado — {{.app.metadata.name}}"
+      body: |
+        <h2>✅ Desplegado exitosamente</h2>
+        <table>
+          <tr><td><b>App</b></td><td>{{.app.metadata.name}}</td></tr>
+          <tr><td><b>Namespace</b></td><td>{{.app.spec.destination.namespace}}</td></tr>
+          <tr><td><b>Revision</b></td><td>{{if .app.status.sync.revision}}{{substr 0 7 .app.status.sync.revision}}{{else}}{{substr 0 7 (index .app.status.sync.revisions 1)}}{{end}}</td></tr>
+          <tr><td><b>Commit</b></td><td><a href="{{index .app.metadata.annotations "github-repo-url"}}/commit/{{if .app.status.operationState.syncResult.revision}}{{.app.status.operationState.syncResult.revision}}{{else if .app.status.sync.revision}}{{.app.status.sync.revision}}{{else}}{{index .app.status.sync.revisions 1}}{{end}}">Ver en GitHub</a></td></tr>
+        </table>
+
+  trigger.on-sync-failed: |
+    - when: app.status.operationState.phase in ['Error', 'Failed']
+      send: [app-sync-failed]
+
+  trigger.on-health-degraded: |
+    - when: app.status.health.status == 'Degraded'
+      send: [app-health-degraded]
+
+  trigger.on-deployed: |
+    - when: app.status.operationState.phase in ['Succeeded'] and app.status.health.status == 'Healthy'
+      oncePer: app.status.operationState.syncResult.revision
+      send: [app-deployed]

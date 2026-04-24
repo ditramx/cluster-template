@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metallb
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
+    github-repo-url: "<GITHUB_REPO_URL>"
+    notifications.argoproj.io/subscribe.on-sync-failed.webex: ""
+    notifications.argoproj.io/subscribe.on-health-degraded.webex: ""
+    notifications.argoproj.io/subscribe.on-deployed.webex: ""
+    notifications.argoproj.io/subscribe.on-sync-failed.smtp: "<NOTIFICATION_EMAIL>"
+    notifications.argoproj.io/subscribe.on-health-degraded.smtp: "<NOTIFICATION_EMAIL>"
+    notifications.argoproj.io/subscribe.on-deployed.smtp: "<NOTIFICATION_EMAIL>"
+spec:
+  project: infra
+  sources:
+    - repoURL: https://metallb.github.io/metallb
+      chart: metallb
+      targetRevision: "0.14.9"
+      helm:
+        valueFiles:
+          - $values/infra/metallb/values.yaml
+    - repoURL: <REPO_URL>
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: metallb-system
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /spec/conversion/webhook/clientConfig/caBundle
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

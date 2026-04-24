@@ -1,0 +1,7 @@
+controller:
+  tolerations: []
+
+speaker:
+  tolerations: []
+  frr:
+    enabled: false

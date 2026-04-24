@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-notifications
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    github-repo-url: "<GITHUB_REPO_URL>"
+spec:
+  project: infra
+  source:
+    repoURL: <REPO_URL>
+    targetRevision: HEAD
+    path: infra/argocd-notifications/resources
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

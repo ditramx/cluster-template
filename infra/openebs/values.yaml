@@ -1,0 +1,31 @@
+preUpgradeHook:
+  image:
+    registry: docker.io
+    repo: bitnami/kubectl
+    tag: "latest"
+    pullPolicy: Always
+
+engines:
+  replicated:
+    mayastor:
+      enabled: false
+  local:
+    lvm:
+      enabled: false
+    zfs:
+      enabled: false
+
+nfs-provisioner:
+  enabled: false
+
+localpv-provisioner:
+  analytics:
+    enabled: false
+  localpv:
+    hostpathClass:
+      enabled: true
+      isDefaultClass: true
+      basePath: "/var/openebs/local"
+  localpvprovisioner:
+    # k0s: /var/lib/k0s/kubelet — kubeadm/rke2: /var/lib/kubelet
+    kubeletDir: "/var/lib/kubelet"
